@@ -1,0 +1,16 @@
+# Android / IntelliJ
+.gradle
+/build
+/local.properties
+/.idea
+/*.iml
+.DS_Store
+
+# Signing
+*.keystore
+*.jks
+
+# Built APKs
+*.apk
+dt2s-aligned.apk
+double-tap-sleep-final.apk.idsig

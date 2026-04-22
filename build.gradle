@@ -1,0 +1,50 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.3.2'
+    }
+}
+
+apply plugin: 'com.android.application'
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://api.xposed.info/' }
+    }
+}
+
+android {
+    namespace 'com.example.dt2s'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.example.dt2s"
+        minSdk 31
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+        
+        // Suppress warning about compileSdk 36
+        resValue "string", "app_name", "DT2S"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    compileOnly 'de.robv.android.xposed:api:82'
+}
