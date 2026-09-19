@@ -78,6 +78,7 @@ public class MainHook implements IXposedHookLoadPackage {
             private KeyguardManager mKeyguardManager;
             private int mStatusBarHeight = -1;
             private long mLastEventTime = 0;
+            private int mLastEventAction = -1;
 
             @Override
             protected void beforeHookedMethod(final MethodHookParam param) throws Throwable {
@@ -85,16 +86,18 @@ public class MainHook implements IXposedHookLoadPackage {
                 MotionEvent event = (MotionEvent) param.args[0];
                 int action = event.getActionMasked();
 
+                // De-duplication: Ensure one physical touch event = one detector update
+                // Fixes GestureDetector state machine corruption when multiple hooked views receive the same event
+                if (event.getEventTime() == mLastEventTime && action == mLastEventAction) return;
+                mLastEventTime = event.getEventTime();
+                mLastEventAction = action;
+
                 // Dynamic Release & Pre-Caching
                 if (action == MotionEvent.ACTION_DOWN) {
                     mMuzzleUntil = 0;
                     // Pre-fetch resource height on first touch to ensure zero latency during double-tap
                     if (mStatusBarHeight <= 0) mStatusBarHeight = getStatusBarHeight(view.getContext());
                 }
-
-                // De-duplication: Ensure one touch = one detector update
-                if (event.getEventTime() == mLastEventTime && action == MotionEvent.ACTION_DOWN) return;
-                mLastEventTime = event.getEventTime();
 
                 if (mGestureDetector == null) {
                     Context context = view.getContext().getApplicationContext();
@@ -141,9 +144,35 @@ public class MainHook implements IXposedHookLoadPackage {
 
         try {
             XposedHelpers.findAndHookMethod("com.android.systemui.statusbar.phone.PhoneStatusBarView", lpparam.classLoader, "dispatchTouchEvent", MotionEvent.class, touchHook);
-            XposedHelpers.findAndHookMethod("com.android.systemui.shade.NotificationShadeWindowView", lpparam.classLoader, "dispatchTouchEvent", MotionEvent.class, touchHook);
         } catch (Throwable t) {
-            XposedBridge.log(TAG + " Hooking failed: " + t.getMessage());
+            XposedBridge.log(TAG + " Status bar hooking failed: " + t.getMessage());
+        }
+
+        boolean shadeHooked = false;
+        String[] shadeClasses = {
+            // Android 17 (Flexiglass) Root Views
+            "com.android.systemui.scene.ui.view.WindowRootView",
+            "com.android.systemui.scene.ui.view.SceneWindowRootView",
+            "com.android.systemui.keyguard.ui.view.KeyguardRootView",
+            // Android 14-16 Root Views
+            "com.android.systemui.shade.NotificationShadeWindowView",
+            "com.android.systemui.window.NotificationShadeWindowView",
+            // Legacy Root Views
+            "com.android.systemui.statusbar.window.NotificationShadeWindowView",
+            "com.android.systemui.shade.ShadeWindowView",
+            "com.android.systemui.statusbar.phone.NotificationShadeWindowView"
+        };
+        for (String shadeClass : shadeClasses) {
+            try {
+                XposedHelpers.findAndHookMethod(shadeClass, lpparam.classLoader, "dispatchTouchEvent", MotionEvent.class, touchHook);
+                shadeHooked = true;
+                XposedBridge.log(TAG + " Successfully hooked lockscreen target: " + shadeClass);
+                break; // Essential: Prevents heavy redundant Xposed callbacks on UI thread
+            } catch (Throwable ignored) {}
+        }
+
+        if (!shadeHooked) {
+            XposedBridge.log(TAG + " CRITICAL: All lockscreen hooks failed. SystemUI structure has changed.");
         }
     }
 
