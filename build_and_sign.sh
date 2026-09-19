@@ -36,9 +36,9 @@ echo "Using Build Tools: $BUILD_TOOLS"
 
 echo "[1/4] Cleaning and building APK..."
 cd "$PROJECT_DIR"
-./gradlew clean assembleDebug --quiet
+./gradlew clean assembleRelease --quiet
 
-APK_RAW=$(find "$PROJECT_DIR/build/outputs/apk/debug" -name "*.apk" | head -n 1)
+APK_RAW=$(find "$PROJECT_DIR/build/outputs/apk/release" -name "*-release-unsigned.apk" -o -name "*.apk" | head -n 1)
 
 if [ -z "$APK_RAW" ]; then
     echo "Error: APK not found."
