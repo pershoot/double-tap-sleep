@@ -113,14 +113,18 @@ public class MainHook implements IXposedHookLoadPackage {
 
                     mGestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
                         @Override
-                        public boolean onDoubleTap(MotionEvent e) {
-                            // Robust lockscreen detection: Use AOSP KeyguardManager
+                        public boolean onDoubleTapEvent(MotionEvent e) {
+                            // Hardware baseline: Defer sleep to ACTION_UP
+                            // Prevents sensor corruption (fixes Tap-to-Wake failures (lazy double-taps))
+                            if (e.getActionMasked() != MotionEvent.ACTION_UP) return false;
+
+                            // Robust Lockscreen Detection: Use AOSP KeyguardManager
                             boolean isLockscreen = mKeyguardManager != null && mKeyguardManager.isKeyguardLocked();
 
                             if (isLockscreen) {
                                 if (isBouncerShowing(getPanelController(view))) return false;
                             } else {
-                                // Desktop mode: Strictly status bar area (using pre-cached height)
+                                // Desktop Mode: Strictly Status Bar area (Using pre-cached height)
                                 if (e.getRawY() > mStatusBarHeight) return false;
                             }
 
@@ -156,13 +160,16 @@ public class MainHook implements IXposedHookLoadPackage {
                         }
                     });
 
-                    // Synchronous polling latch: Dynamically freeze UI thread until screen reports OFF.
+                    // Synchronous polling latch: Dynamically freeze UI thread until screen reports OFF or DOZE.
                     // Max timeout: 1000ms (prevents ANR if hw state poll fails).
+                    Display display = dm.getDisplay(Display.DEFAULT_DISPLAY);
                     long start = SystemClock.uptimeMillis();
                     while (SystemClock.uptimeMillis() - start < 1000) {
-                        Display display = dm.getDisplay(Display.DEFAULT_DISPLAY);
-                        if (display != null && display.getState() == Display.STATE_OFF) {
-                            break;
+                        if (display != null) {
+                            int state = display.getState();
+                            if (state == Display.STATE_OFF || state == Display.STATE_DOZE || state == Display.STATE_DOZE_SUSPEND) {
+                                break;
+                            }
                         }
                         try { Thread.sleep(10); } catch (Exception ignored) {}
                     }
