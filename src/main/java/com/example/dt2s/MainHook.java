@@ -12,6 +12,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.Display;
 import android.hardware.display.DisplayManager;
+import android.os.Process;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,7 +31,19 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final String SYSTEMUI_PACKAGE = "com.android.systemui";
 
     // Reusable warm thread eliminates OS scheduling latency on raw thread creation
-    private static final ExecutorService sExecutor = Executors.newSingleThreadExecutor();
+    // Elevated priority prevents scheduler starvation under heavy BG load (e.g. app installs)
+    private static final ExecutorService sExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY);
+                    r.run();
+                }
+            }, "dt2s-sleep");
+        }
+    });
 
     // volatile ensures absolute visibility across UI and Vibration threads
     private static volatile long mMuzzleUntil = 0;
@@ -118,13 +132,13 @@ public class MainHook implements IXposedHookLoadPackage {
                             // Prevents sensor corruption (fixes Tap-to-Wake failures (lazy double-taps))
                             if (e.getActionMasked() != MotionEvent.ACTION_UP) return false;
 
-                            // Robust Lockscreen Detection: Use AOSP KeyguardManager
+                            // Robust lockscreen detection: Use AOSP KeyguardManager
                             boolean isLockscreen = mKeyguardManager != null && mKeyguardManager.isKeyguardLocked();
 
                             if (isLockscreen) {
                                 if (isBouncerShowing(getPanelController(view))) return false;
                             } else {
-                                // Desktop Mode: Strictly Status Bar area (Using pre-cached height)
+                                // Desktop mode: Strictly status bar area (using pre-cached height)
                                 if (e.getRawY() > mStatusBarHeight) return false;
                             }
 
