@@ -55,10 +55,10 @@ if [ ! -f "$KEYSTORE" ]; then
     keytool -genkey -v -keystore "$KEYSTORE" -storepass "$KS_PASS" -alias androiddebugkey -keypass "$KS_PASS" -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storetype PKCS12
 fi
 
-"$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$PROJECT_DIR/double-tap-sleep-final.apk" "$PROJECT_DIR/dt2s-aligned.apk"
+"$BUILD_TOOLS/apksigner" -J-enable-native-access=ALL-UNNAMED sign --ks "$KEYSTORE" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$PROJECT_DIR/double-tap-sleep-final.apk" "$PROJECT_DIR/dt2s-aligned.apk"
 
 echo "[4/4] Verifying APK..."
-"$BUILD_TOOLS/apksigner" verify "$PROJECT_DIR/double-tap-sleep-final.apk"
+"$BUILD_TOOLS/apksigner" -J-enable-native-access=ALL-UNNAMED verify "$PROJECT_DIR/double-tap-sleep-final.apk"
 
 rm "$PROJECT_DIR/dt2s-aligned.apk"
 
